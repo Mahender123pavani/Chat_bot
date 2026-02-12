@@ -84,16 +84,25 @@ with chat_container:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # User input
-prompt = st.chat_input("Type your message...")
+user_input = st.chat_input("Type your message...")
 
-if prompt:
-    st.chat_message("user").write(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+if user_input:
+    st.chat_message("user").write(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     # Typing animation for assistant with streaming
     with st.chat_message("assistant"):
-        max_tokens = max(50, min(len(prompt)*2, 200))
-        response = bot(prompt, max_new_tokens=max_tokens, do_sample=True)[0]["generated_text"]
+        prompt = f"You are a helpful, friendly AI chatbot. Respond clearly and concisely.\nUser: {user_input}\nAssistant:"
+
+        max_tokens = max(50, min(len(user_input)*2, 150))  # limit for smoother performance
+        response = bot(
+            prompt,
+            max_new_tokens=max_tokens,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9
+        )[0]["generated_text"]
+
         reply = response.replace(prompt, "").strip()
 
         # Emoji reactions
@@ -108,6 +117,6 @@ if prompt:
         for char in reply:
             display_text += char
             placeholder.markdown(display_text)
-            time.sleep(0.01)  # smooth and fast typing
+            time.sleep(0.01)
 
         st.session_state.messages.append({"role": "assistant", "content": reply})
