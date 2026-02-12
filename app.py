@@ -21,18 +21,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 Laxmi AI Chatbot (Falcon-7B-Instruct)")
+st.title("🤖 Laxmi AI Chatbot")
 
-# Load Falcon-7B-Instruct with token
+# Load model with fallback
 @st.cache_resource
 def load_model():
     hf_token = st.secrets.get("HUGGINGFACE_TOKEN", None)
-    if hf_token is None:
-        st.warning("Hugging Face token missing. Only public models can be used.")
-    MODEL_NAME = "tiiuae/falcon-7b-instruct"
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
-    return TextGenerationPipeline(model=model, tokenizer=tokenizer)
+    if hf_token:
+        st.info("Using Falcon-7B-Instruct (requires token)")
+        MODEL_NAME = "tiiuae/falcon-7b-instruct"
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+    else:
+        st.warning("Hugging Face token missing! Using public GPT2-medium instead.")
+        MODEL_NAME = "gpt2-medium"
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 bot: TextGenerationPipeline = load_model()
 
@@ -61,12 +66,14 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
-        prompt = f"You are a helpful AI chatbot. Respond clearly and concisely.\nUser: {user_input}\nAssistant:"
+        prompt = f"You are a helpful AI chatbot. Respond clearly.\nUser: {user_input}\nAssistant:"
 
-        # Stream small chunk responses
+        # Adjust max tokens depending on model
+        max_tokens = 150 if st.secrets.get("HUGGINGFACE_TOKEN", None) else 120
+
         response = bot(
             prompt,
-            max_new_tokens=150,
+            max_new_tokens=max_tokens,
             do_sample=True,
             temperature=0.7,
             top_p=0.9
