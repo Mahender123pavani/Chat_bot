@@ -1,12 +1,10 @@
-# app.py
 import streamlit as st
 import time
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, TextGenerationPipeline
 
-# Page config
 st.set_page_config(page_title="Laxmi AI", page_icon="🤖", layout="wide")
 
-# Dark mode & chat styling
+# Dark mode styling
 st.markdown("""
 <style>
 .stApp { background-color: #0E1117; color: #FFFFFF; }
@@ -23,17 +21,17 @@ st.markdown("""
 
 st.title("🤖 Laxmi AI Chatbot")
 
-# Load model with fallback
+# Load model safely
 @st.cache_resource
 def load_model():
-    hf_token = st.secrets.get("HUGGINGFACE_TOKEN", None)
+    hf_token = st.secrets.get("HUGGINGFACE_TOKEN")  # <- safe .get(), will return None if missing
     if hf_token:
-        st.info("Using Falcon-7B-Instruct (requires token)")
+        st.info("Using Falcon-7B-Instruct (with Hugging Face token)")
         MODEL_NAME = "tiiuae/falcon-7b-instruct"
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
         model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
     else:
-        st.warning("Hugging Face token missing! Using public GPT2-medium instead.")
+        st.warning("Hugging Face token missing. Falling back to GPT2-medium (public).")
         MODEL_NAME = "gpt2-medium"
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
@@ -41,16 +39,16 @@ def load_model():
 
 bot: TextGenerationPipeline = load_model()
 
-# Session memory
+# Session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Clear chat button
+# Clear chat
 if st.button("🗑️ Clear Chat"):
     st.session_state.messages = []
     st.success("Chat cleared!")
 
-# Scrollable chat container
+# Chat display
 chat_container = st.container()
 with chat_container:
     st.markdown('<div class="chat-box">', unsafe_allow_html=True)
@@ -66,19 +64,10 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
     with st.chat_message("assistant"):
-        prompt = f"You are a helpful AI chatbot. Respond clearly.\nUser: {user_input}\nAssistant:"
+        prompt = f"You are a helpful AI chatbot.\nUser: {user_input}\nAssistant:"
 
-        # Adjust max tokens depending on model
-        max_tokens = 150 if st.secrets.get("HUGGINGFACE_TOKEN", None) else 120
-
-        response = bot(
-            prompt,
-            max_new_tokens=max_tokens,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9
-        )[0]["generated_text"]
-
+        max_tokens = 150 if st.secrets.get("HUGGINGFACE_TOKEN") else 120
+        response = bot(prompt, max_new_tokens=max_tokens, do_sample=True, temperature=0.7, top_p=0.9)[0]["generated_text"]
         reply = response.replace(prompt, "").strip()
 
         # Emoji reactions
