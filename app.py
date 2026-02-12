@@ -3,10 +3,10 @@ import streamlit as st
 import time
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, TextGenerationPipeline
 
-# Page configuration
+# Page config
 st.set_page_config(page_title="Laxmi AI", page_icon="🤖", layout="wide")
 
-# Dark mode & chat styling
+# Dark mode CSS
 st.markdown("""
 <style>
 .stApp { background-color: #0E1117; color: #FFFFFF; }
@@ -55,9 +55,9 @@ if "messages" not in st.session_state:
 # Clear chat
 if st.button("🗑️ Clear Chat"):
     st.session_state.messages = []
-    st.success("Chat cleared!")
+    st.experimental_rerun()
 
-# Chat display
+# Display chat
 chat_container = st.container()
 with chat_container:
     st.markdown('<div class="chat-box">', unsafe_allow_html=True)
