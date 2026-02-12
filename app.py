@@ -1,10 +1,12 @@
+# app.py
 import streamlit as st
 import time
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, TextGenerationPipeline
 
+# Page configuration
 st.set_page_config(page_title="Laxmi AI", page_icon="🤖", layout="wide")
 
-# Dark mode styling
+# Dark mode & chat styling
 st.markdown("""
 <style>
 .stApp { background-color: #0E1117; color: #FFFFFF; }
@@ -21,25 +23,32 @@ st.markdown("""
 
 st.title("🤖 Laxmi AI Chatbot")
 
-# Load model safely
+# Load model safely with fallback
 @st.cache_resource
 def load_model():
-    hf_token = st.secrets.get("HUGGINGFACE_TOKEN")  # <- safe .get(), will return None if missing
-    if hf_token:
-        st.info("Using Falcon-7B-Instruct (with Hugging Face token)")
-        MODEL_NAME = "tiiuae/falcon-7b-instruct"
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
-        model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
-    else:
-        st.warning("Hugging Face token missing. Falling back to GPT2-medium (public).")
+    hf_token = st.secrets.get("HUGGINGFACE_TOKEN")  # <-- safe access
+    try:
+        if hf_token:
+            st.info("Using Falcon-7B-Instruct with Hugging Face token")
+            MODEL_NAME = "tiiuae/falcon-7b-instruct"
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+            model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+        else:
+            st.warning("Hugging Face token missing. Falling back to GPT2-medium (public).")
+            MODEL_NAME = "gpt2-medium"
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+            model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    except Exception as e:
+        st.error(f"Error loading model: {e}. Falling back to GPT2-medium (public).")
         MODEL_NAME = "gpt2-medium"
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+
     return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 bot: TextGenerationPipeline = load_model()
 
-# Session state
+# Session memory
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -67,7 +76,14 @@ if user_input:
         prompt = f"You are a helpful AI chatbot.\nUser: {user_input}\nAssistant:"
 
         max_tokens = 150 if st.secrets.get("HUGGINGFACE_TOKEN") else 120
-        response = bot(prompt, max_new_tokens=max_tokens, do_sample=True, temperature=0.7, top_p=0.9)[0]["generated_text"]
+        response = bot(
+            prompt,
+            max_new_tokens=max_tokens,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9
+        )[0]["generated_text"]
+
         reply = response.replace(prompt, "").strip()
 
         # Emoji reactions
