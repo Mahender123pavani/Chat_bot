@@ -1,7 +1,7 @@
 # app.py
 import streamlit as st
 import time
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, TextGenerationPipeline
 
 # Page config
 st.set_page_config(page_title="Laxmi AI", page_icon="🤖", layout="wide")
@@ -21,17 +21,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🤖 Laxmi AI Chatbot")
+st.title("🤖 Laxmi AI Chatbot (Falcon-7B-Instruct)")
 
-# Load lightweight public model
+# Load Falcon-7B-Instruct with token
 @st.cache_resource
 def load_model():
-    MODEL_NAME = "gpt2-medium"  # fast, public, lightweight
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-    return pipeline("text-generation", model=model, tokenizer=tokenizer)
+    hf_token = st.secrets.get("HUGGINGFACE_TOKEN", None)
+    if hf_token is None:
+        st.warning("Hugging Face token missing. Only public models can be used.")
+    MODEL_NAME = "tiiuae/falcon-7b-instruct"
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, use_auth_token=hf_token)
+    return TextGenerationPipeline(model=model, tokenizer=tokenizer)
 
-bot = load_model()
+bot: TextGenerationPipeline = load_model()
 
 # Session memory
 if "messages" not in st.session_state:
@@ -40,7 +43,7 @@ if "messages" not in st.session_state:
 # Clear chat button
 if st.button("🗑️ Clear Chat"):
     st.session_state.messages = []
-    st.experimental_rerun()
+    st.success("Chat cleared!")
 
 # Scrollable chat container
 chat_container = st.container()
@@ -57,14 +60,13 @@ if user_input:
     st.chat_message("user").write(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # Typing animation for assistant
     with st.chat_message("assistant"):
-        prompt = f"You are a helpful AI chatbot. Respond clearly.\nUser: {user_input}\nAssistant:"
+        prompt = f"You are a helpful AI chatbot. Respond clearly and concisely.\nUser: {user_input}\nAssistant:"
 
-        max_tokens = max(50, min(len(user_input)*2, 120))  # smaller limit for speed
+        # Stream small chunk responses
         response = bot(
             prompt,
-            max_new_tokens=max_tokens,
+            max_new_tokens=150,
             do_sample=True,
             temperature=0.7,
             top_p=0.9
@@ -78,7 +80,7 @@ if user_input:
         elif "good" in reply.lower():
             reply += " 😊"
 
-        # Stream text
+        # Typing animation
         placeholder = st.empty()
         display_text = ""
         for char in reply:
